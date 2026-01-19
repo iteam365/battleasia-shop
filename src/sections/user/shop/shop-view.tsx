@@ -73,6 +73,7 @@ export function ShopView() {
     const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_OPTIONS)[number]>('bkash');
     const [submitting, setSubmitting] = useState(false);
     const [playerId] = useState<string>('');
+    const [walletNumber, setWalletNumber] = useState<string>('');
 
     const fetchCurrencyRates = async () => {
         try {
@@ -123,12 +124,34 @@ export function ShopView() {
     };
 
     const handleConfirmPurchase = async () => {
+        console.log("handleConfirmPurchase");
+        console.log(selectedItem);
         if (!selectedItem) return;
+        console.log(paymentMethod);
+        if (paymentMethod === 'crypto') {
+            enqueueSnackbar('Please choose bKash or Nagad for Coingopay checkout', { variant: 'warning' });
+            return;
+        }
+        if (!walletNumber.trim()) {
+            enqueueSnackbar('Wallet number is required', { variant: 'warning' });
+            return;
+        }
         try {
             setSubmitting(true);
-            await api.buyCoinsApi({ amount: selectedItem.amount, paymentMethod });
-            enqueueSnackbar('Purchase placed successfully', { variant: 'success' });
-            setSelectedItem(null);
+            const res = await api.startCoingoCollectionApi({
+                amount: selectedItem.amount,
+                walletNumber: walletNumber.trim(),
+                walletType: paymentMethod,
+            });
+            const url = res?.data?.data?.url;
+            if (url) {
+                window.open(url, '_blank');
+                enqueueSnackbar('Redirecting to payment...', { variant: 'success' });
+                setSelectedItem(null);
+                setWalletNumber('');
+            } else {
+                enqueueSnackbar('Payment link unavailable', { variant: 'error' });
+            }
         } catch (error) {
             enqueueSnackbar('Buy request failed', { variant: 'error' });
         } finally {
@@ -441,6 +464,13 @@ export function ShopView() {
                                                 )}
                                             </Card>
                                         </Stack>
+                                        <TextField
+                                            fullWidth
+                                            label="Wallet number"
+                                            value={walletNumber}
+                                            onChange={(e) => setWalletNumber(e.target.value)}
+                                            placeholder={paymentMethod === 'bkash' ? '01XXXXXXXXX' : '01XXXXXXXXX'}
+                                        />
                                         {paymentMethod === 'crypto' ? (
                                             <Stack direction="row" justifyContent="space-between" alignItems="center">
                                                 <Typography variant="body1" fontWeight={600}>

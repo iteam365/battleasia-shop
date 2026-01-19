@@ -29,3 +29,6 @@ export const buyCoinsApi = (data: { amount: number; paymentMethod?: string }) =>
   axios.post('/api/v3/coins/buy', data);
 
 export const sellCoinsApi = (data: { amount: number }) => axios.post('/api/v3/coins/sell', data);
+
+export const startCoingoCollectionApi = (data: { amount: number; walletNumber: string; walletType: string }) =>
+  axios.post('/api/v3/payments/coingo/collection/start', data);
