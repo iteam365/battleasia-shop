@@ -32,3 +32,6 @@ export const sellCoinsApi = (data: { amount: number }) => axios.post('/api/v3/co
 
 export const startCoingoCollectionApi = (data: { amount: number; walletNumber: string; walletType: string }) =>
   axios.post('/api/v3/payments/coingo/collection/start', data);
+
+export const getCoingoCollectionStatusApi = (merchantSerialNo: string) =>
+  axios.get(`/api/v3/payments/coingo/collection/${merchantSerialNo}/status`);

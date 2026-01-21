@@ -33,5 +33,6 @@ export type ApiContextType = {
   buyCoinsApi: (data: { amount: number; paymentMethod?: string }) => Promise<any>;
   sellCoinsApi: (data: { amount: number }) => Promise<any>;
   startCoingoCollectionApi: (data: { amount: number; walletNumber: string; walletType: string }) => Promise<any>;
+  getCoingoCollectionStatusApi: (merchantSerialNo: string) => Promise<any>;
 };
 

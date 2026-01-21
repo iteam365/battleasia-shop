@@ -74,6 +74,8 @@ export function ShopView() {
     const [submitting, setSubmitting] = useState(false);
     const [playerId] = useState<string>('');
     const [walletNumber, setWalletNumber] = useState<string>('');
+    const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle');
+    const [paymentRef, setPaymentRef] = useState<string>('');
 
     const fetchCurrencyRates = async () => {
         try {
@@ -144,7 +146,12 @@ export function ShopView() {
                 walletType: paymentMethod,
             });
             const url = res?.data?.data?.url;
+            const ref = res?.data?.data?.merchantSerialNo;
             if (url) {
+                if (ref) {
+                    setPaymentRef(ref);
+                    setPaymentStatus('pending');
+                }
                 window.open(url, '_blank');
                 enqueueSnackbar('Redirecting to payment...', { variant: 'success' });
                 setSelectedItem(null);
@@ -158,6 +165,34 @@ export function ShopView() {
             setSubmitting(false);
         }
     };
+
+    useEffect(() => {
+        let timer: any;
+        const poll = async () => {
+            if (!paymentRef) return;
+            try {
+                const res = await api.getCoingoCollectionStatusApi(paymentRef);
+                const status = res?.data?.data?.status;
+                if (status === 'success' || status === 'failed' || status === 'cancelled') {
+                    setPaymentStatus(status === 'success' ? 'success' : 'failed');
+                    setPaymentRef('');
+                    if (status === 'success') {
+                        enqueueSnackbar('Payment confirmed', { variant: 'success' });
+                    } else {
+                        enqueueSnackbar('Payment not completed', { variant: 'error' });
+                    }
+                    return;
+                }
+            } catch (err) {
+                // silent retry
+            }
+            timer = setTimeout(poll, 4000);
+        };
+        poll();
+        return () => {
+            if (timer) clearTimeout(timer);
+        };
+    }, [api, paymentRef, enqueueSnackbar]);
 
     const findRateForMethod = (method: (typeof PAYMENT_OPTIONS)[number]) => {
         const lookup = (code: string) =>
@@ -464,6 +499,13 @@ export function ShopView() {
                                                 )}
                                             </Card>
                                         </Stack>
+                                        {paymentStatus === 'pending' && paymentRef ? (
+                                            <Card variant="outlined" sx={{ p: 1, bgcolor: 'warning.lighter', borderColor: 'warning.main' }}>
+                                                <Typography variant="body2" sx={{ color: 'warning.darker' }}>
+                                                    Payment in progress... keep this tab open.
+                                                </Typography>
+                                            </Card>
+                                        ) : null}
                                         <TextField
                                             fullWidth
                                             label="Wallet number"
