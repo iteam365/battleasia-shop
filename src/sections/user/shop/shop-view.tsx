@@ -1,22 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-    Box,
-    Card,
-    Grid2 as Grid,
-    Grid as MuiGrid,
-    Stack,
-    Typography,
-    Container,
-    Chip,
-    Button,
-    Skeleton,
-    MenuItem,
-    TextField,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Divider,
+  Box,
+  Card,
+  Grid2 as Grid,
+  Grid as MuiGrid,
+  Stack,
+  Typography,
+  Container,
+  Chip,
+  Button,
+  Skeleton,
+  MenuItem,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider,
+  Backdrop,
+  CircularProgress,
 } from '@mui/material';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -27,6 +29,7 @@ import useApi from 'src/hooks/use-api';
 import { useSnackbar } from 'src/components/snackbar';
 import { CONFIG } from 'src/global-config';
 import { Iconify } from 'src/components/iconify';
+import { useSelector } from 'src/store';
 
 type ShopItem = {
     amount: number;
@@ -34,6 +37,7 @@ type ShopItem = {
     originalPrice: number;
     discountPercent: number;
     badge: string | null;
+    badgeColor: 'default' | 'success' | 'primary' | 'secondary' | 'error' | 'info' | 'warning';
     symbol: string;
     image: string;
     isActive?: boolean;
@@ -52,16 +56,17 @@ const PAYMENT_OPTIONS = ['bkash', 'nagad', 'crypto'] as const;
 
 const PAYMENT_META: Record<
     (typeof PAYMENT_OPTIONS)[number],
-    { label: string; imgurl: string; helper?: string }
+    { label: string; imgurl: string; helper?: string; color?: string }
 > = {
-    bkash: { label: 'BKash', imgurl: '/assets/images/bkash.png' },
-    nagad: { label: 'Nagad', imgurl: '/assets/images/nagad.png' },
-    crypto: { label: 'Crypto (USDT)', imgurl: '/assets/images/usdt.png' },
+    bkash: { label: 'BKash', imgurl: '/assets/images/bkash.png', color: '#e2116e' },
+    nagad: { label: 'Nagad', imgurl: '/assets/images/nagad.png', color: '#f6921e' },
+    crypto: { label: 'Crypto (USDT)', imgurl: '/assets/images/usdt.png', color: '#50af95' },
 };
 
 export function ShopView() {
     const api = useApi();
     const { enqueueSnackbar } = useSnackbar();
+    const playerEmail = useSelector((state) => state.auth.user?.email || '');
 
     const [shopItems, setShopItems] = useState<ShopItem[]>([]);
     const [currencyRates, setCurrencyRates] = useState<CurrencyRate[]>([]);
@@ -72,10 +77,10 @@ export function ShopView() {
     const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
     const [paymentMethod, setPaymentMethod] = useState<(typeof PAYMENT_OPTIONS)[number]>('bkash');
     const [submitting, setSubmitting] = useState(false);
-    const [playerId] = useState<string>('');
-    const [walletNumber, setWalletNumber] = useState<string>('');
-    const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed'>('idle');
+    const [walletNumber, setWalletNumber] = useState<string>('01000000000');
+    const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'failed' | 'expired'>('idle');
     const [paymentRef, setPaymentRef] = useState<string>('');
+    const [paymentExpiryAt, setPaymentExpiryAt] = useState<number | null>(null);
 
     const fetchCurrencyRates = async () => {
         try {
@@ -118,7 +123,7 @@ export function ShopView() {
 
     const handleOpenModal = (item: ShopItem) => {
         setSelectedItem(item);
-        setPaymentMethod('bkash');
+        setPaymentMethod(paymentFilter ? (paymentFilter as (typeof PAYMENT_OPTIONS)[number]) : 'bkash');
     };
 
     const handleCloseModal = () => {
@@ -126,10 +131,7 @@ export function ShopView() {
     };
 
     const handleConfirmPurchase = async () => {
-        console.log("handleConfirmPurchase");
-        console.log(selectedItem);
         if (!selectedItem) return;
-        console.log(paymentMethod);
         if (paymentMethod === 'crypto') {
             enqueueSnackbar('Please choose bKash or Nagad for Coingopay checkout', { variant: 'warning' });
             return;
@@ -141,7 +143,8 @@ export function ShopView() {
         try {
             setSubmitting(true);
             const res = await api.startCoingoCollectionApi({
-                amount: selectedItem.amount,
+                // BDT rate
+                amount: selectedItem.amount * (currencyRates.find((r) => r.currency.toLowerCase() === 'bdt')?.rate ?? 0),
                 walletNumber: walletNumber.trim(),
                 walletType: paymentMethod,
             });
@@ -151,11 +154,10 @@ export function ShopView() {
                 if (ref) {
                     setPaymentRef(ref);
                     setPaymentStatus('pending');
+                    setPaymentExpiryAt(Date.now() + 10 * 60 * 1000); // 10 minutes
                 }
                 window.open(url, '_blank');
                 enqueueSnackbar('Redirecting to payment...', { variant: 'success' });
-                setSelectedItem(null);
-                setWalletNumber('');
             } else {
                 enqueueSnackbar('Payment link unavailable', { variant: 'error' });
             }
@@ -176,6 +178,7 @@ export function ShopView() {
                 if (status === 'success' || status === 'failed' || status === 'cancelled') {
                     setPaymentStatus(status === 'success' ? 'success' : 'failed');
                     setPaymentRef('');
+                    setPaymentExpiryAt(null);
                     if (status === 'success') {
                         enqueueSnackbar('Payment confirmed', { variant: 'success' });
                     } else {
@@ -193,6 +196,27 @@ export function ShopView() {
             if (timer) clearTimeout(timer);
         };
     }, [api, paymentRef, enqueueSnackbar]);
+
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        if (paymentStatus === 'pending' && paymentExpiryAt) {
+            const remaining = paymentExpiryAt - Date.now();
+            if (remaining <= 0) {
+                setPaymentStatus('expired');
+                setPaymentRef('');
+                setPaymentExpiryAt(null);
+            } else {
+                timer = setTimeout(() => {
+                    setPaymentStatus('expired');
+                    setPaymentRef('');
+                    setPaymentExpiryAt(null);
+                }, remaining);
+            }
+        }
+        return () => {
+            if (timer) clearTimeout(timer);
+        };
+    }, [paymentStatus, paymentExpiryAt]);
 
     const findRateForMethod = (method: (typeof PAYMENT_OPTIONS)[number]) => {
         const lookup = (code: string) =>
@@ -258,12 +282,36 @@ export function ShopView() {
                                     size="small"
                                     label="Choose payment"
                                     value={paymentFilter}
-                                    onChange={(e) => setPaymentFilter(e.target.value)}
+                                    onChange={(e) => {setPaymentFilter(e.target.value); setPaymentMethod(e.target.value as (typeof PAYMENT_OPTIONS)[number])}}
                                     sx={{ mb: 2, textTransform: 'capitalize' }}
+                                    SelectProps={{
+                                        MenuProps: {
+                                            PaperProps: { sx: { bgcolor: '#fff', 
+                                                backgroundImage: 'linear-gradient(to right, #fff, #f5f5f5)' } },
+                                        },
+                                    }}
                                 >
                                     {PAYMENT_OPTIONS.map((opt) => (
-                                        <MenuItem key={opt} value={opt} sx={{ textTransform: 'capitalize' }}>
-                                            {opt}
+                                        <MenuItem
+                                            key={opt}
+                                            value={opt}
+                                            sx={{ textTransform: 'capitalize', bgcolor: '#fff' }}
+                                        >
+                                            <Stack direction="row" spacing={1.5} alignItems="center">
+                                                <Box
+                                                    sx={{
+                                                        backgroundImage: `url(${PAYMENT_META[opt].imgurl})`,
+                                                        backgroundSize: 'contain',
+                                                        backgroundPosition: 'left',
+                                                        backgroundRepeat: 'no-repeat',
+                                                        width: 48,
+                                                        height: 32,
+                                                        borderRadius: 1,
+                                                        bgcolor: 'transparent',
+                                                    }}
+                                                />
+                                                <Typography variant="body2">{PAYMENT_META[opt].label}</Typography>
+                                            </Stack>
                                         </MenuItem>
                                     ))}
                                 </TextField>
@@ -329,19 +377,19 @@ export function ShopView() {
                                                     gap: 1.5,
                                                 }}
                                             >
-                                                {shopItem.badge && (
+                                                {shopItem.badge && shopItem.badge.toLowerCase()!="none" && (
                                                     <Chip
                                                         label={shopItem.badge}
-                                                        color="success"
+                                                        color={shopItem.badgeColor}
                                                         size="small"
                                                         sx={{ alignSelf: 'flex-start' }}
                                                     />
                                                 )}
-                                                <Image src={CONFIG.serverUrl + shopItem.image} alt="BAC coins" ratio="4/3" />
-                                                <Typography variant="h6">{shopItem.amount}</Typography>
+                                                <Image draggable="false" src={CONFIG.serverUrl + shopItem.image} alt="BAC coins" ratio="4/3" sx={{ borderRadius: 1 }} />
+                                                <Typography variant="h6">{shopItem.amount} {shopItem.symbol}</Typography>
                                                 <Stack direction="row" alignItems="center" spacing={1}>
                                                     <Typography variant="h6" sx={{ color: 'primary.main' }}>
-                                                        {shopItem.price}
+                                                        ${shopItem.price}
                                                     </Typography>
                                                     {shopItem.discountPercent > 0 && (
                                                         <Typography
@@ -387,10 +435,10 @@ export function ShopView() {
                                             <Stack direction="row" alignItems="center" spacing={1}>
                                                 <Iconify icon="solar:user-outline" />
                                                 <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                                    Player ID
+                                                    Player Email
                                                 </Typography>
                                             </Stack>
-                                            <Typography variant="subtitle1">{playerId || '—'}</Typography>
+                                            <Typography variant="subtitle1">{playerEmail || '—'}</Typography>
                                             <Divider />
                                             <Stack direction="row" alignItems="center" spacing={1}>
                                                 <Iconify icon="solar:ticket-outline" />
@@ -408,7 +456,6 @@ export function ShopView() {
                                         <Typography variant="subtitle1">Select payment channels</Typography>
                                         <Stack spacing={1}>
                                             {PAYMENT_OPTIONS.map((method) => {
-                                                const selected = paymentMethod === method;
                                                 const meta = PAYMENT_META[method];
                                                 return (
                                                     <Card
@@ -417,10 +464,10 @@ export function ShopView() {
                                                         sx={{
                                                             p: 1.5,
                                                             border: '1px solid',
-                                                            borderColor: selected ? 'primary.main' : 'divider',
-                                                            boxShadow: selected ? 6 : 0,
+                                                            borderColor: paymentMethod === method ? 'primary.main' : 'divider',
+                                                            boxShadow: paymentMethod === method ? 6 : 0,
                                                             cursor: 'pointer',
-                                                            bgcolor: selected ? 'action.hover' : 'background.paper',
+                                                            bgcolor: paymentMethod === method ? 'action.hover' : 'background.paper',
                                                             transition: (theme) =>
                                                                 theme.transitions.create(['box-shadow', 'border-color', 'background-color'], {
                                                                     duration: theme.transitions.duration.shorter,
@@ -465,7 +512,7 @@ export function ShopView() {
                                     <Stack spacing={2}>
                                         <Typography variant="subtitle1">Order summary</Typography>
                                         <Stack direction="row" alignItems="center" spacing={2}>
-                                            <Image src={CONFIG.serverUrl + selectedItem.image} alt="Coin" sx={{ width: 64, height: 64 }} />
+                                            <Image draggable="false" src={CONFIG.serverUrl + selectedItem.image} alt="Coin" sx={{ width: 64, height: 64, borderRadius: 1 }} />
                                             <Stack spacing={0.5}>
                                                 <Typography variant="subtitle2">Coins</Typography>
                                                 <Typography variant="body1">{selectedItem.amount}</Typography>
@@ -499,20 +546,14 @@ export function ShopView() {
                                                 )}
                                             </Card>
                                         </Stack>
-                                        {paymentStatus === 'pending' && paymentRef ? (
-                                            <Card variant="outlined" sx={{ p: 1, bgcolor: 'warning.lighter', borderColor: 'warning.main' }}>
-                                                <Typography variant="body2" sx={{ color: 'warning.darker' }}>
-                                                    Payment in progress... keep this tab open.
-                                                </Typography>
-                                            </Card>
-                                        ) : null}
-                                        <TextField
+                                       
+                                        {/* <TextField
                                             fullWidth
                                             label="Wallet number"
                                             value={walletNumber}
                                             onChange={(e) => setWalletNumber(e.target.value)}
                                             placeholder={paymentMethod === 'bkash' ? '01XXXXXXXXX' : '01XXXXXXXXX'}
-                                        />
+                                        /> */}
                                         {paymentMethod === 'crypto' ? (
                                             <Stack direction="row" justifyContent="space-between" alignItems="center">
                                                 <Typography variant="body1" fontWeight={600}>
@@ -543,7 +584,13 @@ export function ShopView() {
                         </MuiGrid>
                     )}
                 </DialogContent>
-                <DialogActions>
+                {/* red text color for some text  */}
+                {/* <Stack direction="row" justifyContent="flex-end" px={2} alignItems="center">
+                    <Typography variant="body2" color="error">
+                        Payments can only be made in Bangladeshi Taka (BDT).
+                    </Typography>
+                </Stack> */}
+                <DialogActions sx={{ }}>
                     <Button onClick={handleCloseModal} disabled={submitting}>
                         Cancel
                     </Button>
@@ -552,6 +599,53 @@ export function ShopView() {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <Backdrop
+                open={paymentStatus === 'pending' || paymentStatus === 'expired'}
+                sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.modal + 2 }}
+            >
+                <Stack
+                    spacing={2}
+                    alignItems="center"
+                    justifyContent="center"
+                    sx={{
+                        bgcolor: 'rgba(0,0,0,0.85)',
+                        px: 3,
+                        py: 2.5,
+                        borderRadius: 2,
+                        boxShadow: 6,
+                        minWidth: 280,
+                    }}
+                >
+                    {paymentStatus === 'pending' ? (
+                        <CircularProgress color="inherit" size={28} />
+                    ) : (
+                        <Iconify icon="solar:close-circle-bold" width={28} height={28} color="error.main" />
+                    )}
+                    <Typography variant="body2">
+                        {paymentStatus === 'expired'
+                            ? 'Payment expired'
+                            : paymentStatus === 'pending'
+                            ? 'Payment in progress...'
+                            : paymentStatus === 'failed'
+                            ? 'Payment not completed'
+                            : 'Payment expired'}
+                    </Typography>
+                    {paymentStatus === 'expired' || paymentStatus === 'failed' ? (
+                        <Button
+                            variant="contained"
+                            onClick={() => {
+                                setPaymentStatus('idle');
+                                setPaymentRef('');
+                                setPaymentExpiryAt(null);
+                            }}
+                            sx={{ px: 3 }}
+                        >
+                            Close
+                        </Button>
+                    ) : null}
+                </Stack>
+            </Backdrop>
         </Box>
     );
 }
