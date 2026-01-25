@@ -46,3 +46,14 @@ export const GAME_SERVERS = [
   { value: 'middle-east', label: 'Middle East' },
   { value: 'krjp', label: 'KRJP' },
 ];
+
+export const PAYMENT_OPTIONS = ['bkash', 'nagad', 'crypto'] as const;
+export const PAYMENT_META: Record<
+    (typeof PAYMENT_OPTIONS)[number],
+    { label: string; imgurl: string; helper?: string; color?: string }
+> = {
+    bkash: { label: 'BKash', imgurl: '/assets/images/bkash.png', color: '#e2116e' },
+    nagad: { label: 'Nagad', imgurl: '/assets/images/nagad.png', color: '#f6921e' },
+    crypto: { label: 'Crypto (USDT)', imgurl: '/assets/images/usdt.png', color: '#50af95' },
+};
+// -

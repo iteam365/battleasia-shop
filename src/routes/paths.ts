@@ -34,7 +34,7 @@ export const paths = {
       root: `${ROOTS.USER}/account`,
       profile: `${ROOTS.USER}/account/profile`,
       profileDetail: (userId: string | number) => `${ROOTS.USER}/account/profile/${userId}`,
-      wallet: `${ROOTS.USER}/account/wallet`,
+      wallet: `${ROOTS.USER}/wallet`,
       notifications: `${ROOTS.USER}/account/notifications`,
     },
     shop: `${ROOTS.USER}/shop`,

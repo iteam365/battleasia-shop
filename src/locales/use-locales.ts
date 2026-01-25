@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { toast } from 'src/components/snackbar';
+import { toast } from 'react-hot-toast';
 
 import { allLangs } from './all-langs';
 import { fallbackLng, changeLangMessages as messages } from './locales-config';

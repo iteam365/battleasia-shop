@@ -6,7 +6,7 @@ import { store } from 'src/store';
 import { CONFIG } from 'src/global-config';
 import { logoutAction } from 'src/store/reducers/auth';
 
-import { toast } from 'src/components/snackbar';
+import { toast } from 'react-hot-toast';
 
 // ----------------------------------------------------------------------
 

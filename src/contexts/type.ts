@@ -27,12 +27,15 @@ export type ApiContextType = {
     type?: string;
   }) => Promise<any>;
   getShopItemApi: (id: string) => Promise<any>;
-  checkoutShopApi: (data: { items: { itemId: string; quantity: number }[]; shippingAddress?: any }) => Promise<any>;
-  listMyOrdersApi: (params?: { page?: number; limit?: number; status?: string }) => Promise<any>;
   getCurrencyRatesApi: () => Promise<any>;
-  buyCoinsApi: (data: { amount: number; paymentMethod?: string }) => Promise<any>;
-  sellCoinsApi: (data: { amount: number }) => Promise<any>;
-  startCoingoCollectionApi: (data: { amount: number; walletNumber: string; walletType: string }) => Promise<any>;
+  // coingo collection
+  startCoingoCollectionApi: (data: { email: string; amount: number; walletNumber: string; walletType: string }) => Promise<any>;
   getCoingoCollectionStatusApi: (merchantSerialNo: string) => Promise<any>;
+  // coingo payout
+  createCoingoPayoutApi: (data: { amount: number; walletNumber: string; walletType: string; description?: string }) => Promise<any>;
+  getCoingoPayoutStatusApi: (merchantSerialNo: string) => Promise<any>;
+  // balance history
+  getBalanceHistoryApi: (params?: { page?: number; limit?: number }) => Promise<any>;
+  
 };
 

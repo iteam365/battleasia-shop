@@ -47,6 +47,12 @@ export const accountMenuItems: AccountMenuItem[] = [
     icon: <Iconify icon="solar:shop-bold" />,
     mobileMenu: true,
   },
+  {
+    label: 'Wallet',
+    href: paths.user.account.wallet,
+    icon: <Iconify icon="solar:wallet-bold" />,
+    mobileMenu: true,
+  },
 ];
 
 // ----------------------------------------------------------------------

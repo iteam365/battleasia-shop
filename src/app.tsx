@@ -10,6 +10,7 @@ import { themeConfig, ThemeProvider } from 'src/theme';
 import { ProgressBar } from 'src/components/progress-bar';
 import { MotionLazy } from 'src/components/animate/motion-lazy';
 import { SettingsDrawer, defaultSettings, SettingsProvider } from 'src/components/settings';
+import { Toaster } from 'react-hot-toast';
 
 import { AuthConsumer } from './utils/authcheck';
 import { SocialLinksFab } from './components/social-links-fab';
@@ -34,6 +35,13 @@ export default function App({ children }: AppProps) {
         >
           <MotionLazy>
             <ProgressBar />
+            <Toaster
+              position="top-center"
+              reverseOrder={false}
+              toastOptions={{
+                duration: 4000,
+              }}
+            />
             <SettingsDrawer defaultSettings={defaultSettings} />
             <AuthConsumer>
               {children}

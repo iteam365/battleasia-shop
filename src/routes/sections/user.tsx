@@ -10,6 +10,7 @@ import { UserLayout } from 'src/layouts/user';
 import { LoadingScreen } from 'src/components/loading-screen';
 
 import { usePathname } from '../hooks';
+import WalletPage from 'src/pages/user/wallet';
 
 // ----------------------------------------------------------------------
 
@@ -41,6 +42,7 @@ export const userRoutes: RouteObject[] = [
     children: [
       { index: true, element: <ShopPage /> },
       { path: 'shop', element: <ShopPage /> },
+      { path: 'wallet', element: <WalletPage /> },
     ],
   },
 ];

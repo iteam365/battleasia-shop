@@ -26,10 +26,10 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { Image } from 'src/components/image';
 import { EmptyContent } from 'src/components/empty-content';
 import useApi from 'src/hooks/use-api';
-import { useSnackbar } from 'src/components/snackbar';
-import { CONFIG } from 'src/global-config';
+import { CONFIG, PAYMENT_OPTIONS, PAYMENT_META } from 'src/global-config';
 import { Iconify } from 'src/components/iconify';
 import { useSelector } from 'src/store';
+import { toast } from 'react-hot-toast';
 
 type ShopItem = {
     amount: number;
@@ -52,20 +52,8 @@ type CurrencyRate = {
     updatedAt: string;
 };
 
-const PAYMENT_OPTIONS = ['bkash', 'nagad', 'crypto'] as const;
-
-const PAYMENT_META: Record<
-    (typeof PAYMENT_OPTIONS)[number],
-    { label: string; imgurl: string; helper?: string; color?: string }
-> = {
-    bkash: { label: 'BKash', imgurl: '/assets/images/bkash.png', color: '#e2116e' },
-    nagad: { label: 'Nagad', imgurl: '/assets/images/nagad.png', color: '#f6921e' },
-    crypto: { label: 'Crypto (USDT)', imgurl: '/assets/images/usdt.png', color: '#50af95' },
-};
-
 export function ShopView() {
     const api = useApi();
-    const { enqueueSnackbar } = useSnackbar();
     const playerEmail = useSelector((state) => state.auth.user?.email || '');
 
     const [shopItems, setShopItems] = useState<ShopItem[]>([]);
@@ -88,7 +76,7 @@ export function ShopView() {
             const res = await api.getCurrencyRatesApi();
             setCurrencyRates(res?.data?.data || []);
         } catch (error) {
-            enqueueSnackbar('Failed to load coin offers', { variant: 'error' });
+            toast.error('Failed to load coin offers');
         } finally {
             setLoading(false);
         }
@@ -100,7 +88,7 @@ export function ShopView() {
             const res = await api.listShopItemsApi();
             setShopItems(res?.data?.data?.results || []);
         } catch (error) {
-            enqueueSnackbar('Failed to load coin offers', { variant: 'error' });
+            toast.error('Failed to load coin offers');
         } finally {
             setLoading(false);
         }
@@ -133,17 +121,19 @@ export function ShopView() {
     const handleConfirmPurchase = async () => {
         if (!selectedItem) return;
         if (paymentMethod === 'crypto') {
-            enqueueSnackbar('Please choose bKash or Nagad for Coingopay checkout', { variant: 'warning' });
+            toast.error('Please choose bKash or Nagad for Coingopay checkout');
             return;
         }
         if (!walletNumber.trim()) {
-            enqueueSnackbar('Wallet number is required', { variant: 'warning' });
+            toast.error('Wallet number is required');
             return;
         }
         try {
             setSubmitting(true);
+            // create deposit API.
             const res = await api.startCoingoCollectionApi({
                 // BDT rate
+                email: playerEmail,
                 amount: selectedItem.amount * (currencyRates.find((r) => r.currency.toLowerCase() === 'bdt')?.rate ?? 0),
                 walletNumber: walletNumber.trim(),
                 walletType: paymentMethod,
@@ -157,12 +147,12 @@ export function ShopView() {
                     setPaymentExpiryAt(Date.now() + 10 * 60 * 1000); // 10 minutes
                 }
                 window.open(url, '_blank');
-                enqueueSnackbar('Redirecting to payment...', { variant: 'success' });
+                toast.success('Redirecting to payment...');
             } else {
-                enqueueSnackbar('Payment link unavailable', { variant: 'error' });
+                toast.error('Payment link unavailable');
             }
         } catch (error) {
-            enqueueSnackbar('Buy request failed', { variant: 'error' });
+            toast.error('Buy request failed');
         } finally {
             setSubmitting(false);
         }
@@ -180,9 +170,9 @@ export function ShopView() {
                     setPaymentRef('');
                     setPaymentExpiryAt(null);
                     if (status === 'success') {
-                        enqueueSnackbar('Payment confirmed', { variant: 'success' });
+                        toast.success('Payment confirmed');
                     } else {
-                        enqueueSnackbar('Payment not completed', { variant: 'error' });
+                        toast.error('Payment not completed');
                     }
                     return;
                 }
@@ -195,7 +185,7 @@ export function ShopView() {
         return () => {
             if (timer) clearTimeout(timer);
         };
-    }, [api, paymentRef, enqueueSnackbar]);
+    }, [api, paymentRef]);
 
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | null = null;
@@ -377,12 +367,12 @@ export function ShopView() {
                                                     gap: 1.5,
                                                 }}
                                             >
-                                                {shopItem.badge && shopItem.badge.toLowerCase()!="none" && (
+                                                {shopItem.badge && (
                                                     <Chip
                                                         label={shopItem.badge}
                                                         color={shopItem.badgeColor}
                                                         size="small"
-                                                        sx={{ alignSelf: 'flex-start' }}
+                                                        sx={{ alignSelf: 'flex-start', visibility: shopItem.badge.toLowerCase()!="none" ? 'visible' : 'hidden' }}
                                                     />
                                                 )}
                                                 <Image draggable="false" src={CONFIG.serverUrl + shopItem.image} alt="BAC coins" ratio="4/3" sx={{ borderRadius: 1 }} />
